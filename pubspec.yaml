@@ -1,0 +1,33 @@
+name: talaicsc
+description: A new Flutter project.
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.4 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  google_maps_flutter: ^2.1.1
+  http: ^1.2.2 # เพิ่มแพ็คเกจ http
+  geolocator: ^12.0.0
+  geocoding: ^3.0.0
+  location: ^7.0.0
+  image_picker: ^0.8.5+3
+  community_charts_flutter: ^1.0.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/image/logo.png
+    - assets/image/car_icon.png
+    - assets/image/bus.png
