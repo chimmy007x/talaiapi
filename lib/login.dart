@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'user_page.dart';
 import 'officer_page.dart';
 import 'bus_page.dart'; // import หน้า driver page
+import 'ngrokhttp.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -27,7 +28,7 @@ class _LoginState extends State<Login> {
     try {
       final response = await http
           .post(
-            Uri.parse('http://10.0.2.2/data_talaicsc/api/login.php'),
+            Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/login.php')),
             headers: <String, String>{
               'Content-Type': 'application/json; charset=UTF-8',
             },

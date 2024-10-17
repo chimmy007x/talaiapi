@@ -21,7 +21,7 @@ class _OfficerPageState extends State<OfficerPage> {
         ),
         title: Row(
           children: [
-            const Text('Talai', style: TextStyle(fontSize: 16)),
+            const Text('Talai Officer', style: TextStyle(fontSize: 25)),
             const Spacer(),
             const Icon(Icons.directions_bus),
             const SizedBox(width: 10),
@@ -34,22 +34,6 @@ class _OfficerPageState extends State<OfficerPage> {
       ),
       body: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.grey[200],
-            child: Row(
-              children: const [
-                Icon(Icons.location_on, color: Colors.red),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'หอพัก (ชาย) อินทนิล 59/9 หมู่ 1 ต.เชียงเครือ\nอ.เมือง จ.สกลนคร 47000',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.all(16.0),

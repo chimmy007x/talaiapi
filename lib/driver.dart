@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'ngrokhttp.dart';
 
 class DriverPage extends StatefulWidget {
   @override
@@ -17,7 +18,7 @@ class _DriverPageState extends State<DriverPage> {
   }
 
   Future<void> fetchDrivers() async {
-    final response = await http.get(Uri.parse('http://10.0.2.2/data_talaicsc/api/get_drivers.php'));
+    final response = await http.get(Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/get_drivers.php')));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);

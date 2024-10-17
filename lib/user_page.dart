@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'building.dart';
+import 'dart:async';
+import 'ngrokhttp.dart';
 
 class UserPage extends StatefulWidget {
   final String fname;
@@ -12,11 +14,12 @@ class UserPage extends StatefulWidget {
   final String nontriId;
 
   const UserPage({
-    super.key, 
-    required this.fname, 
-    required this.lname, 
+    super.key,
+    required this.fname,
+    required this.lname,
     required this.status,
-    required this.nontriId,});
+    required this.nontriId,
+  });
 
   @override
   _UserPageState createState() => _UserPageState();
@@ -27,17 +30,29 @@ class _UserPageState extends State<UserPage> {
   LocationData? _lastSavedLocation;
   final Location _location = Location();
   bool _isLoading = true;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _getLocation();
+    // เรียก _getLocation ทุกๆ 1 วินาที
+    _timer = Timer.periodic(Duration(seconds: 1), (Timer timer) {
+      _getLocation();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // ยกเลิก Timer เมื่อปิดหน้าจอ
+    super.dispose();
   }
 
   Future<void> _getLocation() async {
     bool _serviceEnabled;
     PermissionStatus _permissionGranted;
 
+    // ตรวจสอบว่าเปิดการใช้งาน Location หรือไม่
     _serviceEnabled = await _location.serviceEnabled();
     if (!_serviceEnabled) {
       _serviceEnabled = await _location.requestService();
@@ -49,6 +64,7 @@ class _UserPageState extends State<UserPage> {
       }
     }
 
+    // ตรวจสอบว่าได้รับอนุญาตการใช้งาน Location หรือไม่
     _permissionGranted = await _location.hasPermission();
     if (_permissionGranted == PermissionStatus.denied) {
       _permissionGranted = await _location.requestPermission();
@@ -60,86 +76,117 @@ class _UserPageState extends State<UserPage> {
       }
     }
 
+    // รับข้อมูลตำแหน่งปัจจุบัน
     final locationData = await _location.getLocation();
     setState(() {
-      _currentLocation = locationData;
-      _isLoading = false;
+      _currentLocation = locationData;  // อัปเดตข้อมูลตำแหน่ง
+      _isLoading = false;               // ปิดสถานะการโหลด
     });
   }
 
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    // กำหนดค่า R เป็นรัศมีของโลกในหน่วยเมตร (6371000 เมตร)
     const double R = 6371000;
+
+    // คำนวณการเปลี่ยนแปลงของละติจูดระหว่างสองจุด (แปลงจากองศาเป็นเรเดียน)
     final double dLat = _degreesToRadians(lat2 - lat1);
+
+    // คำนวณการเปลี่ยนแปลงของลองจิจูดระหว่างสองจุด (แปลงจากองศาเป็นเรเดียน)
     final double dLon = _degreesToRadians(lon1 - lon2);
+
+    // ใช้สูตร Haversine คำนวณความโค้งของระยะทางระหว่างสองจุด
     final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_degreesToRadians(lat1)) * cos(_degreesToRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
+        cos(_degreesToRadians(lat1)) *
+        cos(_degreesToRadians(lat2)) *
+        sin(dLon / 2) *
+        sin(dLon / 2);
+
+    // คำนวณมุมระหว่างสองจุดจากค่า a
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    // คืนค่าระยะทางโดยคูณมุมกับรัศมีโลก (R) ผลลัพธ์จะเป็นระยะทางในหน่วยเมตร
     return R * c;
-  }
-
-  double _degreesToRadians(double degrees) {
-    return degrees * pi / 180;
-  }
-
-  Future<void> _saveLocation() async {
-  if (_currentLocation != null) {
-    if (_lastSavedLocation != null) {
-      double distance = _calculateDistance(
-        _lastSavedLocation!.latitude!,
-        _lastSavedLocation!.longitude!,
-        _currentLocation!.latitude!,
-        _currentLocation!.longitude!,
-      );
-
-      if (distance < 10) {
-        _showPopup(
-            title: 'ตำแหน่งใกล้เกินไป',
-            message: 'คุณได้บันทึกตำแหน่งในบริเวณนี้ไปแล้ว.');
-        return;
-      }
-    }
-
-    // ปรับการสร้าง positionId เพื่อป้องกันการซ้ำ
-    final positionId = "POS_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}";
-
-    try {
-      final response = await http.post(
-        Uri.parse('http://10.0.2.2/data_talaicsc/api/save_position.php'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, dynamic>{
-          'position_id': positionId,
-          'latitude': _currentLocation!.latitude,
-          'longitude': _currentLocation!.longitude,
-          'nontri_id': widget.nontriId, // เพิ่ม nontri_id ที่คุณส่งมาจากหน้าแรก
-        }),
-      );
-
-      final responseData = jsonDecode(response.body);
-      if (responseData['success']) {
-        _showPopup(
-            title: 'กดเรียกรถสำเร็จ',
-            message: 'บันทึกตำแหน่งการเรียกเรียบร้อยแล้ว.');
-        _lastSavedLocation = _currentLocation;
-      } else if (responseData['error'] == 'duplicate_position') {
-        _showPopup(
-            title: 'มีผู้ใช้อื่นได้ทำการกดเรียกรถแล้ว',
-            message: 'กรุณารอในบริเวณนั้นสักครู่รถกำลังเดินทางมาในอีกไม่ช้า');
-      } else {
-        _showPopup(
-            title: 'ข้อผิดพลาด',
-            message: 'Error: ${responseData['message']}');
-      }
-    } catch (e) {
-      _showPopup(
-          title: 'มีผู้ใช้อื่นได้ทำการกดเรียกรถแล้ว',
-          message: 'กรุณารอในบริเวณนั้นสักครู่รถกำลังเดินทางมาในอีกไม่ช้า');
-    }
-  }
 }
 
+// ฟังก์ชันแปลงองศาเป็นเรเดียน
+double _degreesToRadians(double degrees) {
+    // แปลงองศาเป็นเรเดียนโดยใช้สูตร degrees * pi / 180
+    return degrees * pi / 180;
+}
+
+
+  Future<void> _saveLocation() async {
+    if (_currentLocation != null) {
+      if (_lastSavedLocation != null) {
+        double distance = _calculateDistance(
+          _lastSavedLocation!.latitude!,
+          _lastSavedLocation!.longitude!,
+          _currentLocation!.latitude!,
+          _currentLocation!.longitude!,
+        );
+
+            //การคำนวณระยะทาง 10 เมตรในโค้ดนี้เกิดขึ้นในฟังก์ชัน _saveLocation() โดยใช้ฟังก์ชัน _calculateDistance() ซึ่งคำนวณระยะทางระหว่างตำแหน่งปัจจุบันและตำแหน่งที่บันทึกไว้ล่าสุด (_lastSavedLocation) ในหน่วยเมตร
+        if (distance < 10) {
+          _showPopup(
+              title: 'ตำแหน่งใกล้เกินไป',
+              message: 'มีการกดเรียกรถในบริเวณนี้ไปแล้ว.');
+          return;
+        }
+      }
+
+      // ปรับการสร้าง positionId เพื่อป้องกันการซ้ำ
+      final positionId =
+          "POS_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}";
+
+      try {
+        final response = await http.post(
+          Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/save_position.php')),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: jsonEncode(<String, dynamic>{
+            'position_id': positionId,
+            'latitude': _currentLocation!.latitude,
+            'longitude': _currentLocation!.longitude,
+            'nontri_id': widget.nontriId,
+          }),
+        );
+
+        final responseData = jsonDecode(response.body);
+
+        // ตรวจสอบสถานะของการตอบสนอง
+        if (response.statusCode == 200) {
+          // ตรวจสอบความสำเร็จภายใน JSON
+          if (responseData['success']) {
+            _showPopup(
+              title: 'กดเรียกรถสำเร็จ',
+              message: 'บันทึกตำแหน่งการเรียกเรียบร้อยแล้ว.',
+            );
+            _lastSavedLocation = _currentLocation;
+          } else {
+            // แสดงข้อความจากเซิร์ฟเวอร์หากไม่สำเร็จ
+            _showPopup(
+              title: 'มีผู้ใช้อื่นได้กดเรียกรถแล้ว',
+              message: responseData['message'] ?? 'Unknown error occurred.',
+            );
+          }
+        } else {
+          // เมื่อสถานะไม่ใช่ 200 แสดงข้อความแสดงข้อผิดพลาด
+          _showPopup(
+            title: 'เกิดข้อผิดพลาด',
+            message:
+                'สถานะเซิร์ฟเวอร์: ${response.statusCode}. กรุณาลองอีกครั้ง.',
+          );
+        }
+      } catch (e) {
+        // จัดการข้อผิดพลาดที่เกิดขึ้นระหว่างการเชื่อมต่อ
+        _showPopup(
+          title: 'คุณกดเรียกรถแล้ว',
+          message: 'คนขับรถได้เห็นการเรียกรถแล้วกรุณารอสักครู่.',
+        );
+      }
+    }
+  }
 
   void _showPopup({required String title, required String message}) {
     showDialog(
@@ -178,8 +225,10 @@ class _UserPageState extends State<UserPage> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(); // ปิด Dialog ก่อน
-                Navigator.pushNamedAndRemoveUntil(
-                  context, '/', (Route<dynamic> route) => false); // กลับไปยังหน้าแรกและลบหน้าอื่นๆ
+                Navigator.pushReplacementNamed(
+                  context,
+                  '/', // หรือระบุชื่อหน้าที่ต้องการกลับไป เช่น หน้าเข้าสู่ระบบ
+                ); // ใช้ pushReplacement เพื่อแทนที่หน้าจอปัจจุบัน
               },
               child: Text('ออกจากระบบ'),
             ),
@@ -188,7 +237,6 @@ class _UserPageState extends State<UserPage> {
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -209,11 +257,10 @@ class _UserPageState extends State<UserPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text('Talai'),
                 Text(
-                  'KU CSC',
+                  'Talai KU CSC',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 30,
                   ),
                 ),
               ],
@@ -275,19 +322,12 @@ class _UserPageState extends State<UserPage> {
                 Navigator.pop(context);
               },
             ),
-            // ListTile(
-            //   leading: const Icon(Icons.settings),
-            //   title: const Text('user'),
-            //   onTap: () {
-            //     Navigator.pushNamed(context, '/user');
-            //   },
-            // ),
             ListTile(
               leading: const Icon(Icons.info),
               title: const Text('ร้องเรียน'),
               onTap: () {
                 Navigator.pushNamed(
-                  context, 
+                  context,
                   '/complaint',
                   arguments: {
                     'nontri_id': widget.nontriId, // ส่ง nontri_id ของผู้ใช้ที่เข้าสู่ระบบ
@@ -295,13 +335,6 @@ class _UserPageState extends State<UserPage> {
                 );
               },
             ),
-            // ListTile(
-            //   leading: const Icon(Icons.info),
-            //   title: const Text('เส้นทางการเดินรถ'),
-            //   onTap: () {
-            //     // Navigator.pushNamed(context, '/');
-            //   },
-            // ),
             ListTile(
               leading: const Icon(Icons.person),
               title: const Text('ข้อมูลคนขับรถ'),
@@ -328,9 +361,11 @@ class _UserPageState extends State<UserPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _isLoading
-                      ? const Text('กำลังโหลดตำแหน่ง...', style: TextStyle(fontSize: 16))
+                      ? const Text('กำลังโหลดตำแหน่ง...',
+                          style: TextStyle(fontSize: 16))
                       : _currentLocation == null
-                          ? const Text('ไม่สามารถดึงข้อมูลตำแหน่งได้', style: TextStyle(fontSize: 16))
+                          ? const Text('ไม่สามารถดึงข้อมูลตำแหน่งได้',
+                              style: TextStyle(fontSize: 16))
                           : Text(
                               'ตำแหน่งปัจจุบัน: ละติจูด ${_currentLocation!.latitude}, ลองจิจูด ${_currentLocation!.longitude}',
                               style: const TextStyle(fontSize: 16),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'ngrokhttp.dart';
 
 class ComplaintPage extends StatefulWidget {
   final String nontriId;
@@ -25,7 +26,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://10.0.2.2/data_talaicsc/api/save_complaint.php'),
+        Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/save_complaint.php')),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },

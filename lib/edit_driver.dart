@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'ngrokhttp.dart';
 
 class EditDriverPage extends StatefulWidget {
   @override
@@ -21,8 +22,7 @@ class _EditDriverPageState extends State<EditDriverPage> {
 
   // ดึงข้อมูลคนขับรถจากฐานข้อมูล
   Future<void> fetchDrivers() async {
-    final response = await http
-        .get(Uri.parse('http://10.0.2.2/data_talaicsc/api/get_drivers.php'));
+    final response = await http.get(Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/get_drivers.php')));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -53,8 +53,20 @@ class _EditDriverPageState extends State<EditDriverPage> {
 
   // เพิ่มข้อมูลคนขับรถใหม่
   Future<void> addDriver(Map<String, dynamic> newDriver) async {
+    if (newDriver['number_id'].isEmpty ||
+        newDriver['password'].isEmpty ||
+        newDriver['fname'].isEmpty ||
+        newDriver['lname'].isEmpty ||
+        newDriver['photo'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
+      );
+      return; // หยุดการทำงานหากข้อมูลไม่ครบถ้วน และไม่ปิดป็อปอัพ
+    }
+
+    // ถ้าข้อมูลครบแล้วถึงจะทำการบันทึก
     final response = await http.post(
-      Uri.parse('http://10.0.2.2/data_talaicsc/api/add_driver.php'),
+  Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/add_driver.php')),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
       },
@@ -73,6 +85,7 @@ class _EditDriverPageState extends State<EditDriverPage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('เพิ่มคนขับรถสำเร็จ')));
         fetchDrivers(); // รีโหลดข้อมูลใหม่หลังจากเพิ่มข้อมูล
+        Navigator.of(context).pop(); // ปิดป็อปอัพเมื่อบันทึกสำเร็จ
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('เพิ่มคนขับรถไม่สำเร็จ: ${data['message']}')));
@@ -86,7 +99,7 @@ class _EditDriverPageState extends State<EditDriverPage> {
   // บันทึกการแก้ไขข้อมูลคนขับรถ
   Future<void> saveDriver(Map<String, dynamic> driver) async {
     final response = await http.post(
-      Uri.parse('http://10.0.2.2/data_talaicsc/api/update_driver.php'),
+      Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/update_driver.php')),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8'
       },
@@ -103,10 +116,10 @@ class _EditDriverPageState extends State<EditDriverPage> {
       final data = jsonDecode(response.body);
       if (data['success']) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')));
+            .showSnackBar(SnackBar(content: Text('แก้ไขข้อมูลสำเร็จ')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('บันทึกข้อมูลไม่สำเร็จ: ${data['message']}')));
+            content: Text('แก้ไขข้อมูลไม่สำเร็จ: ${data['message']}')));
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -117,7 +130,7 @@ class _EditDriverPageState extends State<EditDriverPage> {
   // ฟังก์ชันลบข้อมูลคนขับรถ
   Future<void> deleteDriver(String numberId) async {
     final response = await http.post(
-      Uri.parse('http://10.0.2.2/data_talaicsc/api/delete_driver.php'),
+  Uri.parse(NgrokHttp.getUrl('data_talaicsc/api/delete_driver.php')),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8'
       },
@@ -247,8 +260,8 @@ class _EditDriverPageState extends State<EditDriverPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                addDriver(newDriver);
-                Navigator.of(context).pop(); // ปิดป็อบอัพเมื่อบันทึกสำเร็จ
+                addDriver(newDriver); // เรียกใช้ฟังก์ชัน addDriver
+                // ไม่ทำการ pop จนกว่าจะบันทึกสำเร็จในฟังก์ชัน addDriver
               },
               child: Text('บันทึก'),
             ),
@@ -300,7 +313,7 @@ class _EditDriverPageState extends State<EditDriverPage> {
                         //     driver['number_id'] = value;
                         //   },
                         // ),
-                        
+
                         TextFormField(
                           initialValue: driver['password'],
                           decoration: InputDecoration(labelText: 'รหัสผ่าน'),
